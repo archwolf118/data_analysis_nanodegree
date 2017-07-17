@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="https://d3js.org/d3.v3.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dimple/2.2.0/dimple.latest.js"></script>
+
+        <style>
+            
+            body { 
+                max-width:750px;
+                margin:0 auto;
+            }
+
+            h2 {
+                text-align: center;
+                left: 750px;
+                font-size: 20px;
+            }
+
+            div.explanation {
+                -webkit-margin-start: 50px;
+                -webkit-margin-end: 50px;
+                font-family: "Arial";
+                font-size: 15px;
+            }
+
+
+            select.select_button {
+              position:relative;
+              top: 50px;
+              left: 450px;
+            }
+
+            div.buttons {
+              position:relative;
+              top: 20px;
+              left: 80px;
+            }
+
+            div.buttons div {
+              background-color: rgb(251, 201, 127);
+              padding: 5px;
+              margin: 5px;
+              text-align: center;
+              float:left;
+              font-family: "Arial";
+              /*增加按键上的悬停小手*/
+              cursor:pointer;
+            }
+
+        </style>
+
+        <script type="text/javascript">
+            function draw(data){
+                // debugger;
+
+                "use strict";
+                // 标题
+                d3.select("body")
+                  .append("h2")  
+                 .text("Comparison of 'Number or Ratio' of Titanic Survivors and Victims");
+
+
+                // 添加图表的解释
+                d3.select("body")
+                  .append("div")
+                  .attr("class","explanation")  
+                  .text("The below Chart is about statistical results of amount of Titanic survivors and victims.\
+                         The chart provide 3 choices for readers. 'Total' means total member group, \
+                         'Children vs Adults' means comparison between the group (under 12 years old) and the group (above 12 years old),\
+                         'Passenger Class' means comparison of 'class 1' group, 'class 2' group and 'class 3' group. \
+                         You can choose 'abolute' value or 'ratio' value for comparison.\
+                         What interesting info you can find?");
+
+                var margin = 75,
+                    width = 800 - margin,
+                    height = 600 - margin;
+
+                // 建立画图程序
+                function draw_chart(categoryFields,index){
+
+                    var svg = dimple.newSvg("body", width + margin, height + margin);
+
+                    var myChart = new dimple.chart(svg, data);
+                    var x = myChart.addCategoryAxis("x", categoryFields);
+                    if (index === 0){
+                      var y = myChart.addMeasureAxis("y", "Number of people");
+                     } else {
+                      var y = myChart.addPctAxis("y", "Ratio");
+                    };
+                    
+                    var mySeries = myChart.addSeries(['Survived'], dimple.plot.bar);
+                    var myLegend = myChart.addLegend(600, 70, 50, 100, "right");
+                    y.showGridlines = false;
+                    myLegend.width = 50;
+                    mySeries.barGap = 0.4;
+                    myChart.setBounds(60, 30, 510, 305);
+
+                    //统一各图中柱子的颜色，红色代表“遇难”，蓝色代表“幸存”
+                    mySeries.addOrderRule("Survived",true);
+
+                    myChart.draw();
+                    d3.select(".dimple-legend.dimple-legend-text.dimple-no").text("Dead");
+                    d3.select(".dimple-legend.dimple-legend-text.dimple-yes").text("Survived");
+                    
+                    };
+               
+                // 按钮的名称
+                var buttons_list = ["Total", "Children vs Adults", "Passenger Class"];
+
+                // 按钮对应的x轴的类别，方便dimple画图
+                var categoryFields = {"Total": ["Sex"],
+                                 "Children vs Adults": ["Age","Sex"], 
+                                 "Passenger Class": ["Pclass","Sex"]};
+           
+                
+                var select_button_list = ["Absolute","Ratio"]
+                // 创建下拉按钮
+                var select_button = d3.select("body")
+                                .append("div")
+                                .append("select")
+                                .attr("class","select_button");
+
+                var option = select_button.selectAll("option")
+                                   .data(select_button_list)
+                                   .enter()
+                                   .append("option")
+                                   .text(function(d){return d;});
+
+
+                // 创建按钮类并和按钮名称绑定
+                var buttons = d3.select("body")
+                          .append("div")
+                          .attr("class","buttons")
+                          .selectAll("div")
+                          .data(buttons_list)
+                          .enter()
+                          .append("div")
+                          .text(function(d){return d;});
+
+                //网页刷新后初始化 
+                var category_now =["Sex"];
+                draw_chart(category_now,0);          
+                d3.select(".buttons")
+                      .select("div")
+                      .style("background","lightBlue")
+                      .style("color","white")
+
+                function select_groups(index){
+                  buttons.on("click", function(d,selectedIndex){
+                    d3.select('svg')
+                      .remove()
+
+                    d3.select(".buttons")
+                      .selectAll("div")
+                      .transition()
+                      .duration(500)
+                      .style("color","black")
+                      .style("background","rgb(251,201,127)")
+
+                    d3.select(this)
+                      .transition()
+                      .duration(500)
+                      .style("background","lightBlue")
+                      .style("color","white")
+                    
+                    draw_chart(categoryFields[d],index);
+                    
+                    category_now.length = 0;
+                    category_now.push(categoryFields[d]);
+
+                });  
+
+                }
+
+                
+
+                function change(){
+                  var index = select_button.property('selectedIndex');
+                  // debugger;
+                  d3.select('svg')
+                    .remove()
+
+                  draw_chart(category_now[0],index);
+                  // debugger;
+
+                  
+                  select_groups(index);
+                }
+
+
+              // 初始化页面时，设置“绝对值”为当前选项卡
+              select_groups(0);
+              // 选择选项卡后，在选项卡下进行按钮的切换
+              select_button.on("change",change);    
+
+
+            }
+        </script>
+
+    </head>
+
+    <body>
+        <script type="text/javascript">
+            d3.csv("titanic_data.csv", function(d){
+                // 由于Dimple.js在分类时会动态返回Survived的值，
+                // 为避免给出0或1，造成理解的困难，这里修改为yes或no；
+                if (d["Survived"] === "1"){d["Survived"] = "Yes";}
+                else {d["Survived"] = "No";}; 
+                d["Pclass"] = 'Class ' +d["Pclass"] ;
+                // 把12岁以下的儿童分为一组，把12岁以上的分为成人组
+                if  (+d["Age"] > 0 && +d["Age"] <= 12){d["Age"] = 'Children';} 
+                else {d["Age"]= 'Adults'} ;
+                // 针对dimple.js的计数特点，单独增加一列供统计用
+                d["Number of people"] = 1;
+                d["Ratio"] = 1;
+                return d;
+            }, draw);
+        </script>
+
+    </body>
+</html>

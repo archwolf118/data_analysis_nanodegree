@@ -1,0 +1,569 @@
+红葡萄酒数据分析
+========================================================
+本文档使用优达学诚提供的“红葡萄酒质量”数据集来进行分析。数据集概述：这个整齐的数据集包含
+1,599 种红酒，以及 11 个关于酒的化学成分的变量。至少 3 名葡萄酒专家对每种酒的质量进了评分，分数在 0（非常差）和10（非常好）之间。
+此数据集的来源：
+  P. Cortez, A. Cerdeira, F. Almeida, T. Matos and J. Reis. 
+  Modeling wine preferences by data mining from physicochemical properties.
+  In Decision Support Systems, Elsevier, 47(4):547-553. ISSN: 0167-9236.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+#加载分析中所有的程序包 #注：“memisc”程序包和“dplyr”冲突，所以我选择在使用dplyr后再加载memisc，因为如果这里加载“memisc”，select命令就会报错。
+library(ggplot2)
+library(dplyr)
+library(GGally)
+#library(memisc)
+```
+
+
+```{r echo=FALSE, Load_the_Data}
+# 加载数据集
+rw <- read.csv('wineQualityReds.csv')
+```
+
+# Univariate Plots Section 单变量绘图部分
+```{r echo=FALSE}
+dim(rw)
+```
+
+```{r echo=FALSE}
+str(rw)
+```
+
+```{r echo=FALSE}
+summary(rw)
+```
+
+#### **质量分数直方图**
+首先，我想了解一下1599种红葡萄酒质量分数的分布：
+```{r echo=FALSE, fig.height = 3,message=FALSE, warning=FALSE}
+ggplot(aes(x = quality),data = rw) +
+  geom_histogram()
+summary(rw$quality)
+
+table(rw$quality)
+```
+我通过直方图得知大部分红酒的得分在5或6分，最大8分，最小3分。3分只有10个，8分只有18个。  
+下面，画出所有输入变量（2~12项）的直方图。  
+
+#### **“fixed.acidity” 酒石酸**
+```{r echo=FALSE,fig.height = 3,message=FALSE}
+ggplot(aes(x = fixed.acidity ),data = rw) +
+  geom_histogram()
+```
+
+上图为正偏斜分布
+
+#### **“volatile acidity” 醋酸**
+```{r echo=FALSE,fig.height = 3,message=FALSE}
+ggplot(aes(x = volatile.acidity ),data = rw) +
+  geom_histogram()
+```
+
+上图为正偏斜分布
+
+#### **“citric.acid” 柠檬酸**
+```{r echo=FALSE, fig.height = 3,message=FALSE}
+ggplot(aes(x = citric.acid ),data = rw) +
+  geom_histogram()
+```
+
+上图0位置附近和0.5附近的数据最密集，将柱宽改为0.01，如下图所示：  
+
+```{r echo=FALSE, fig.height = 3,message=FALSE}
+ggplot(aes(x = citric.acid ),data = rw) +
+  geom_histogram(binwidth = 0.01, color = 'black')
+```
+
+```{r echo=FALSE}
+table(rw$citric.acid == 0)
+table(rw$citric.acid == 0.49)
+```
+132种红酒的柠檬酸含量为0；  
+68种红酒柠檬酸含量为0.49g/dm^3  
+柠檬酸的含量为0，是否是数据有问题呢？我还想了解一下柠檬酸含量为0的红酒的质量分数分布。
+
+```{r echo=FALSE, fig.height = 3,message=FALSE, warning=FALSE}
+ggplot(aes(x = quality),
+       data = subset(rw, citric.acid == 0)) +
+  geom_histogram()
+table(subset(rw, citric.acid == 0)$quality)
+```
+
+上图可知，柠檬酸含量为0的红酒低分较多，比如有3个3分，10个4分，而整体的红酒中只有10个3分，53个4分。
+
+#### “residual.sugar” 残留糖
+```{r echo=FALSE, fig.height = 3,message=FALSE}
+ggplot(aes(x = residual.sugar ),data = rw) +
+  geom_histogram()
+
+summary(rw$residual.sugar)
+```
+
+可以看到残留糖的分布非常不均匀，最大值为15.5g/dm^3 而中位数只有2.2g/dm^3  
+把残留糖观察范围缩小到0~8g/dm^3
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = residual.sugar ),data = subset(rw,residual.sugar <= 8)) +
+  geom_histogram(binwidth = 0.1)
+```
+
+从上图可以看到，不像长尾分布，围绕2g/dm^3 附近的数据像正态分布。计算IQR = 2.6-1.9 =0.7。根据异常值的定义，大于3.3，小于0.85的数据都为异常值。
+```{r echo=FALSE,}
+nrow(subset(rw,residual.sugar>3.3))
+```
+
+数据集中没有小于0.85的数据，而大于3.3的数据有182个，在1599种红葡萄酒中这个比例超过10%，可能是一部分葡萄酒在酿制的过程中故意保留了较多的糖分。
+
+#### **“chlorides” 氯化钠**
+```{r echo=FALSE, fig.height = 3,message=FALSE}
+ggplot(aes(x = chlorides ),data = rw) +
+  geom_histogram()
+
+summary(rw$chlorides)
+```
+
+氯化钠含量的分布也不均匀，最大值为0.61，中位数仅为0.079。IQR = 0.02，大于0.12小于0.04的数据为异常值。
+
+```{r echo=FALSE}
+nrow(subset(rw,chlorides>0.12))
+nrow(subset(rw,chlorides<0.04))
+```
+
+异常值数量：  
+大于0.12：100个；小于0.04：9个  
+剔除异常值再作图：
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = chlorides),
+       data = subset(rw, chlorides <= 0.12 & chlorides >= 0.04)) +
+  geom_histogram(bins = 30)
+```
+
+近似正态分布
+
+#### **"free.sulfur.dioxide" 游离二氧化硫**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = free.sulfur.dioxide),data = rw) +
+  geom_histogram(bins = 30)
+
+summary(rw$free.sulfur.dioxide)
+```
+
+正偏斜分布
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = free.sulfur.dioxide),
+       data = subset(rw, free.sulfur.dioxide <= 42)) +
+  geom_histogram(binwidth = 1, color = 'black')+
+  scale_x_continuous(breaks = seq(0,40,1))
+```
+
+剔除异常值，改变柱的宽度为1，可以看到游离二氧化硫含量为5mg/m^3 和6mg/m^3的红葡萄酒数量最多。
+
+#### **"total.sulfur.dioxide" 总二氧化硫**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = total.sulfur.dioxide),data = rw) +
+  geom_histogram(bins = 30)
+
+summary(rw$free.sulfur.dioxide)
+```
+
+含有异常值的正偏斜分布，剔除异常值，作图如下：
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = total.sulfur.dioxide),
+       data = subset(rw,total.sulfur.dioxide <= 122)) +
+  geom_histogram(bins = 30)
+```
+
+
+#### **"density" 密度**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = density),data = rw) +
+  geom_histogram(bins = 30)
+
+summary(rw$density)
+```
+
+密度近似正态分布，均值为0.9967,中位数为0.9968，二者非常接近。
+
+#### **"pH"值**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = pH),data = rw) +
+  geom_histogram(bins = 30)
+
+summary(rw$pH)
+```
+
+PH值近似正态分布，均值为3.311，中位数为3.310，二者非常接近。
+
+#### **"sulphates"硫酸钾**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = sulphates),data = rw) +
+  geom_histogram(bins = 30)
+
+summary(rw$sulphates)
+```
+
+剔除异常值后，如下图所示
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = sulphates),
+       data = subset(rw, sulphates<=1)) +
+  geom_histogram(binwidth = 0.02)
+```
+
+正偏斜分布  
+
+#### **"alcohol"酒精含量**
+
+```{r echo=FALSE, fig.height = 3}
+ggplot(aes(x = alcohol),data = rw) +
+  geom_histogram(binwidth = 0.1)
+
+summary(rw$alcohol)
+```
+
+正偏斜分布
+
+#### **创建一个新的变量——酒精浓度区间rw$alcohol_class**
+```{r echo=FALSE}
+rw$alcohol_class <- cut(rw$alcohol,
+                        breaks = c(8,9,10,11,12,13,14,15))
+str(rw)
+```
+我创建了一个新的变量alcohol_class，它把酒精浓度区间分成了7个，即(8,9],(9,10],(10,11],(11,12],(12,13],(13,14],(14,15]
+# **Univariate Analysis 单变量分析**  
+
+#### What is the structure of your dataset?（数据集的结构是什么？）
+
+加载红葡萄据数据集后，得知有1599行数据，15个变量。  
+各变量的含义如下：  
+1. X---------------------编号  
+2. fixed acidity---------酒石酸(g/dm^3)  
+3. volatile acidity------醋酸(g/dm^3)  
+4. citric.acid-----------柠檬酸(g/dm^3)  
+5. residual.sugar--------残留糖(g/dm^3)  
+6. chlorides-------------氯化钠(g/dm^3)  
+7. free.sulfur.dioxide---游离二氧化硫(mg/m^3)  
+8. total.sulfur.dioxide--总二氧化硫(mg/m^3)  
+9. density---------------密度 (g/cm^3)  
+10. PH-------------------PH值  
+11. sulphates------------硫酸钾(g/dm^3)   
+12. alcohol--------------酒精含量(%)  
+13. quality--------------质量分数（10分为满分）    
+14. alcohol_class--------酒精浓度区间
+把上述第2到第12项称为输入变量，第13项（"质量评分"）称为输出变量。  
+其他的一些观察：  
+ - 在1599种红酒中，质量分数最低为3分，最高为8分；得分为5分或6分的红酒数量最多(占比82%),只有10种红酒为3分，53种红酒为4分，18种红酒为8分；  
+ - 正偏斜分布的变量有：酒石酸、醋酸、游离二氧化硫、总二氧化硫、硫酸钾、酒精含量；  
+ - 正态分布的变量有：残留糖（剔除异常值）、氯化钠（剔除异常值）、密度、PH值；  
+ - 柠檬酸含有大量的0值；    
+ - 残留糖和氯化钠的异常值非常多；  
+ - 游离二氧化硫含量为5mg/m^3 和6mg/m^3的红葡萄酒数量最多  
+
+### 最感兴趣的数据集的主要变量是什么？
+
+我对红酒的“质量分数”最感兴趣。我想知道究竟是哪些化学成分影响了红酒的质量分数。是否可以建立数学模型来预测红酒的质量分数？
+
+### 你认为哪些变量可以帮助你开展研究？
+我个人觉得，残留糖（甜味）、氯化钠（鲜味）、柠檬酸（酸味）、醋酸（酸味）、酒精浓度这些我比较熟悉的化学成分,可能会影响红酒的口感，进而影响红酒的分数。
+
+### 是否从原有变量中创建新的变量？
+我新建了一个变量叫alcohol_class，就是把酒精浓度划分成了7个区间，比如9.9%，区间为(9,10]。这样做的好处是：在后面多变量的可视化时候，可以方便的用不用颜色代表酒精浓度。
+
+### 数据集中是否有非常规的数据分布？你对数据进行了整理或者改变数据类型了吗？如果有，为什么要这么做？  
+我发现残留糖、氯化钠有大量的异常值，我在作图的时候剔除了异常值得到了正态分布的图形。剔除异常值作图的好处就是让图形居中，可以近距离观察大部分数据。  
+另外，我发现有132种红酒的柠檬酸含量为0。**柠檬酸在葡萄中本身含量很少，欧盟的一些国家禁止使用柠檬酸来作为加酸剂，但是却可以少量的使用柠檬酸来去除葡萄酒中多余的铁和铜，只有在葡萄酒中没有亚铁氰化钾的情况下使用。我国是禁止人为添加柠檬酸的。柠檬酸缺乏或者过量会导致口感不协调。**  
+柠檬酸为0的红酒可能没有人为的添加柠檬酸，本身含量很少，所以测不出来。另外，柠檬酸含量为0的红酒低分较多，比如有3个3分，10个4分，而整体的红酒中只有10个3分，53个4分。  
+此外，我增加了新的变量alcohol_class，它的数据类型为factor，目的就是给酒精浓度分类，这样做的好处是：在后面多变量的可视化时候，可以方便的用不用颜色代表酒精浓度。
+
+# Bivariate Plots Section 双变量作图部分
+
+#### **相关系数矩阵**
+```{r echo=FALSE}
+#减少输出位数
+options(width = 120, digits = 3)
+#计算相关系数的矩阵
+cor(select(rw,fixed.acidity,volatile.acidity,citric.acid,residual.sugar,
+           chlorides,free.sulfur.dioxide,total.sulfur.dioxide,density,
+           pH,sulphates,alcohol,quality))
+```
+
+通过上表可知，游离二氧化硫和总二氧化硫之间为正相关，这符合常识，因为游离二氧化硫是总二氧化硫的一部分。PH值与酒石酸和柠檬酸是负相关的关系，因为酸含量越高PH值越低。酒石酸含量越高柠檬酸含量也越高；醋酸含量越高，柠檬酸含量越低；酒石酸含量越高，密度越大；  
+我更关心的是质量分数与其他化学成分之间的关系。上表中，残留糖、PH值、游离二氧化硫、总二氧化硫和质量分数的相关性不高，所以在画下面散点图矩阵时，把他们舍去。另外，我感到奇怪的是，作为红酒主要成分的酒石酸和质量分数的相关系数只有0.12。我分析，品酒师评价酒好坏不是看“各种酒的共性的因素”，而看中的是“存在差异的因素”，这样才能分出高下。
+
+#### **散点图矩阵**
+```{r echo=FALSE, fig.height = 15, fig.width =15}
+#因为数据只有1599条，没有必要抽样，直接生成
+ggpairs(select(rw,-X,-pH,-free.sulfur.dioxide,-residual.sugar, -alcohol_class))
+```
+
+通过散点图矩阵可知，酒精含量和质量分数之间存在正相关性（相关系数为0.47）；醋酸含量和质量分数存在负相关（相关系数是-0.391），有可能是醋酸含量过高会使人感到不适，所以影响评分。上图中也验证了，酒石酸和密度之间的正相关、醋酸和柠檬酸的负相关、酒石酸和柠檬酸正相关等关系。由于散点矩阵图过小，而且点之间有重叠，有必要重点分析酒精含量、醋酸含量、硫酸钾（相关系数0.25）、柠檬酸（相关系数0.23）与质量分数的撒点图。
+
+
+#### **“酒精浓度—质量分数”散点图**
+
+```{r echo =FALSE}
+ggplot(aes(x = alcohol, y = quality), data = rw) +
+  geom_point(alpha = 0.25,size = 4, position = 'jitter')
+```
+
+为了方便观察，我将点的深度改为0.25，并且对点的位置进行抖动。从图中可以看出，大部分的点的酒精含量为9%~11%之间，分数集中在5分和6分；随着酒精浓度上升，质量分数也响应提高。得8分的红酒的酒精浓度大多在11%以上。得3分红酒的酒精浓度都小于等于11%。
+
+```{r echo =FALSE, message=FALSE, warning=FALSE,}
+#在这里加载memisc,是因为memisc和dplyr程序包冲突
+library(memisc)
+m = lm(formula = quality ~ alcohol, 
+        data = rw)
+mtable(m,sdigits = 3)
+```
+
+通过计算R^2 ,质量分数中有22.7%是由酒精浓度引起的。
+
+#### **“醋酸—质量分数”散点图**
+```{r echo =FALSE}
+ggplot(aes(x = volatile.acidity, y = quality), data = rw) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+可以从图中看出负相关的关系
+
+```{r echo =FALSE}
+m = lm(formula = quality ~ volatile.acidity, 
+        data = rw)
+mtable(m,sdigits = 3)
+```
+
+通过计算R^2 ,质量分数中有15.3%是由酒精含量引起的。
+
+#### **“硫酸钾—质量分数”散点图**
+```{r echo =FALSE}
+ggplot(aes(x = sulphates, y = quality), data = rw) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+可以从图中看出正相关关系，但当硫酸钾含量大于1.0g/dm^3以后，质量分数相应的降低了。剔除硫酸钾含量的异常值作图如下：  
+
+```{r echo =FALSE}
+ggplot(aes(x = sulphates, y = quality), 
+       data = subset(rw, sulphates<=1)) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+从图中可以看出，得8分的红葡萄酒的硫酸钾含量都在0.6g/dm^3~1.0g/dm^3之间。
+
+```{r echo =FALSE}
+m = lm(formula = quality ~ sulphates, 
+        data = rw)
+mtable(m,sdigits = 3)
+```
+
+通过计算R^2 ,质量分数中有6.3%是由硫酸钾引起的。
+
+#### **“柠檬酸—质量分数”散点图**
+```{r echo =FALSE}
+ggplot(aes(x = citric.acid, y = quality), data = rw) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+可以从图中看出是正相关关系。
+
+```{r echo =FALSE}
+m = lm(formula = quality ~ citric.acid, 
+        data = rw)
+mtable(m,sdigits = 3)
+```
+
+通过计算R^2 ,质量分数中有5.1%是由柠檬酸引起的。
+
+#### **“酒石酸—PH值”散点图**
+
+```{r echo =FALSE}
+ggplot(aes(x = fixed.acidity, y = pH), data = rw) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+可以看到酒石酸含量越高，pH值越低。
+
+
+#### **“酒石酸—密度”散点图**
+
+```{r echo =FALSE}
+ggplot(aes(x = fixed.acidity, y = density), data = rw) +
+  geom_point(alpha = 0.3,size = 4, position = 'jitter')
+```
+
+可以看到酒石酸含量越高，密度越高。
+
+
+# 双变量分析
+
+### 谈一谈你在双变量研究中的发现，你关心的变量与其他参数之间有什么关系？ 
+我发现酒精含量、醋酸含量、硫酸钾、柠檬酸与质量分数相关性最高。  
+- 酒精含量越高，质量分数越高；  
+- 醋酸含量越高，质量分数越低；  
+- 硫酸钾含量越高，质量分数越高；  
+- 柠檬酸含量越高，质量分数越高；  
+
+### 你还发现其他一些有意思的参数关系了吗？
+
+酒石酸含量越高，pH值越低；酒石酸含量越高，密度越高。
+
+### 你发现的最强的相关关系是什么？
+我发现，质量分数与酒精含量相相关性最高，酒精含量高的红酒，得分都较高。得8分的红酒的酒精浓度大多在11%以上。得3分红酒的酒精浓度都<=11%。实际上，葡萄酒在发酵过程中，糖分转化成酒精，含糖量越高，酒精含量也越高，但毕竟是果酒，超过15%是非常困难的，所以世界顶级的葡萄酒庄园都在努力提高葡萄的含糖量。
+但是，通过“酒精含量—质量分数”散点图，我还是很难判断用什么样的曲线来拟合，因为82%的红酒得分都在5分或者6分。通过计算R^2 ,质量分数中有22.7%是由酒精含量引起的。我认为问题就在于：红酒品评师打分会取整数。如果可以给出带有小点后1位的分数（比如5.2分，5.5分），数据分布就会连续的多。
+
+# 多变量作图部分
+
+#### 柠檬酸—酒精浓度—质量分数
+```{r echo=FALSE}
+ggplot(aes(x = citric.acid, y = quality), data = rw) + 
+  geom_jitter(aes(color = alcohol),size = 3)
+```
+
+图中圆点的颜色越深，酒精含量越低；圆点颜色越浅，酒精含量越高。浅色的圆点多集中在图的上部，深色的圆点多集中在图的下部。说明酒精含量高，得分就高。另外，随着柠檬酸含量的提高，质量分数也有提高的趋势。但是上面的图，由于酒精浓度是用深浅表示，区别并不明显，下面用我创建的新的变量alcohol_class，来代替alcohol。
+
+```{r echo=FALSE}
+ggplot(aes(x = citric.acid, y = quality), data = rw) + 
+  geom_jitter(aes(color = alcohol_class),size = 3) +
+  scale_color_brewer(type = 'qual')
+```
+
+图中，红色，蓝色的圆点表示酒精浓度高，多集中在图的上部；橙色、淡紫色的点表示酒精浓度低，多集中在图的下部。
+
+
+#### 硫酸钾—酒精浓度—质量分数
+```{r echo=FALSE}
+ggplot(aes(x = sulphates, y = quality), 
+       data = subset(rw, sulphates<=1)) + 
+  geom_jitter(aes(color = alcohol_class),size = 3) +
+  scale_color_brewer(type = 'qual')
+```
+
+我开始挺奇怪，硫酸钾怎么会对酒的质量评分有影响？后来查阅资料发现，硫酸钾可提高二氧化硫气体的浓度进而抑制微生物和抗氧化。可能葡萄酒的微生物少，口感也就好。上图中的蓝色、红色圆点代表酒精浓度高，多集中在图的上部，即红葡萄酒的质量分数高。
+
+#### 柠檬酸—醋酸—酒精浓度—质量分数
+```{r echo=FALSE}
+ggplot(aes(x = citric.acid, y = volatile.acidity), data = rw) + 
+  geom_jitter(aes(color = alcohol_class),size =3) + 
+  facet_wrap(~quality) +
+  scale_color_brewer(type = 'qual')
+```
+
+6张图代表6种不同的质量分数；横坐标是柠檬酸，纵坐标是醋酸；令人奇怪的是,每张图都表现了随着柠檬酸含量的提高，醋酸的含量就会降低的趋势。由于柠檬酸和醋酸这种相关性，在后面的数学建模时，这两个参数不宜同时使用。   
+点大多集中在5分和6分这两幅图中。代表酒精浓度高的点大多集中在6分、7分、8分这3张图上；相反，3分、4分图上的点的颜色大多数代表酒精浓度低。
+
+#### 建立数学模型
+
+```{r}
+m1 <- lm(I(quality) ~ I(alcohol), data = rw)
+m2 <- update(m1, ~ . + volatile.acidity)
+m3 <- update(m2, ~ . + sulphates)
+mtable(m1, m2, m3,sdigits = 4)
+```
+
+数学模型选取了3个参数来对质量分数进行预测：酒精含量、醋酸含量、硫酸钾来进行分析。得到只有33.6%对质量分数有贡献，显然这个数学模型精度是很低的。
+
+# 多变量分析
+
+### 谈谈你在这部分对各变量关系的发现。各个变量互相作用下对你感兴趣的变量是否产生影响？
+酒精含量、醋酸含量、硫酸钾、柠檬酸均会影响质量分数，但由于醋酸和柠檬酸负相关（相关系数-0.55），在建立数学模型时，我舍去柠檬酸这一参数。
+
+### 有没有令你感兴趣或者吃惊的发现？
+我发现随着随着柠檬酸的提高，醋酸的含量会降低。我分析，柠檬酸具有抗氧化的作用，而醋酸是由乙醇氧化而生成的；所以柠檬酸抑制了醋酸的生成。
+
+### 可选，你是否针对你的数据集创建了数学模型？谈谈你的数学模型的能力和局限性。  
+我对数学模型为:  
+quality = 2.611 + 0.309 &times;alcohol - 1.221 &times; volatile.acidity + 0.679 &times; sulphates  
+这个模型考虑了酒精含量、醋酸和硫酸钾对质量分数的影响。这个线性模型相比人打分要客观，人打分本身就有主观因素，而且打分时取整数也会造成误差。  
+这个数学模型中的参数对质量分数贡献了33.6%，显然这个模型的精度比较低。
+
+------
+
+# 最后的图和总结
+
+### 图1
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = quality),data = rw) +
+  geom_histogram(binwidth = 0.5) + 
+  scale_x_continuous(breaks = seq(3,8,1)) +
+  xlab('质量分数')+
+  ylab('红葡萄酒数量') +
+  ggtitle('图1 质量分数的数量分布')+
+  theme(plot.title = element_text(face="bold", size=15, hjust = 0.5))
+```
+
+### 图1的描述
+
+通过图1可知，红葡萄酒质量分数大部分都在5分或者6分，5分和6分的个数都超过600个，7分接近200个，3分、4分、8分的数量很少。说明得3分、4分的概率很低，但是想要达到8分或8分以上的高分也是非常困难的。
+
+### 图2
+```{r echo =FALSE}
+ggplot(aes(x = alcohol, y = quality), data = rw) +
+  geom_point(alpha = 0.25,size = 4, position = 'jitter', color = 'blue')+
+  scale_x_continuous(breaks = seq(8,15,1)) +
+  xlab('酒精浓度 单位：%')+
+  ylab('质量分数') +
+  ggtitle('图2 “酒精含量—质量分数”散点图')+
+  theme(plot.title = element_text(face="bold", size=15, hjust = 0.5))  
+```
+
+### 图2的描述
+从图2中可以看出，大部分的红酒的酒精浓度为9%到11%之间，分数集中在5分和6分；随着酒精浓度上升，质量分数也响应提高。得8分的红酒的酒精浓度大多在11%以上。得3分红酒的酒精浓度都小于等于11%。说明品酒师对酒精浓度还是非常敏感的，红酒的度数直接影响最后的得分。
+
+### 图3
+```{r echo=FALSE, fig.height = 10, fig.width =15}
+ggplot(aes(x = citric.acid, y = volatile.acidity), data = rw) + 
+  geom_jitter(aes(color = alcohol_class),size =4) + 
+  facet_wrap(~quality)+
+  xlab('柠檬酸含量 单位：g/dm^3')+
+  ylab('醋酸含量 单位：g/dm^3') +
+  ggtitle('图3 基于质量分数的"柠檬酸含量-醋酸含量"分页图')+
+  labs(colour = "酒精浓度%") +
+  theme(plot.title = element_text(face="bold", size= 30, hjust = 0.5),
+        legend.text= element_text(size=15),
+        legend.title = element_text(size =15),
+        axis.title= element_text(size=15))+
+  scale_color_brewer(type = 'qual')
+
+```
+
+### 图3描述
+
+6张图代表6种不同的质量分数；横坐标是柠檬酸，纵坐标是醋酸；每张图都表现了随着柠檬酸含量的提高，醋酸的含量就会降低的趋势，我认为，柠檬酸具有抗氧化的作用，而醋酸是由乙醇氧化而生成的；所以柠檬酸抑制了醋酸的生成。圆点大多集中在5分和6分这两幅图中。代表酒精浓度高的点（红色、蓝色、黄色）大多集中在6分、7分、8分这3张图上；相反，3分和4分图上的点多为紫色、橙色、绿色，即酒精浓度低。
+
+------
+
+# 总结和反思
+本文描述了红酒数据集的结构，解释了各变量的含义。从单一变量入手分析，分析了各个变量的直方图，随后分析了酒精浓度、醋酸含量、硫酸钾含量、柠檬酸含量与质量分数之间的关系，最后又分析了多个变量之间的关系，并提出了基于酒精浓度、醋酸含量、硫酸钾参数的数学模型。  
+**我在分析过程中做的重要决定：**    
+（1）我通过相关系数矩阵，选择了酒精浓度、醋酸含量、硫酸钾含量、柠檬酸作为我分析的参数,因为它们和“质量分数”的相关系数最高。其它变量我就不去关心了，这样做的好处是集中精力抓重点问题，节省了一部分时间，但也可能会造成考虑问题不全面。  
+（2）随后我发现醋酸含量和柠檬酸有负相关关系，我在建模时又把柠檬酸这一参数给舍去了，这样做的好处就是：参与分析的变量相关性都不强；缺点是柠檬酸的味道可能也影响品酒师的打分。    
+（3）我开始并没有在数据集中增加变量，但当我画“多参数图”的时候发现，点的颜色都是渐进的蓝色，区别并不明显，所以我决定增加酒精浓度范围的变量，这样显示的散点图颜色区分就明显的多了。  
+**挫折：**    
+在分析的过程中我发现酒精浓度和质量分数的相关性最高，酒精浓度越大，质量分数也越高。但由于质量分数多集中在5分或6分，而且为整数，我并不能找出一种曲线来较好的模拟酒精浓度和质量分数的相关性，最终得到的数学模型的R^2只有0.3359。  
+我想有如下几个原因造成了很难提出一个完美的数学模型：  
+1. 数据集的样本较少，只有1599条数据；  
+2. 红酒的得分为整数，所以品酒师在打分的时候会人为引入了误差。例如，品酒师认为应该得分在5分和6分之间的红酒，最后给了6分；    
+3. 品酒师对红酒的各人喜好会影响评分；    
+4. 对于品酒师来说，可能给一个中庸的分数（5分或者6分）责任要小一点。比如给一个比较低的分或者比较高的分，可能会有第三方核查，带来不必要的麻烦，所以品酒师在给低分或者高分时候会特别谨慎。  
+**成功：**    
+（1）即便这个数据集可能会有上述问题，我还是找到了一些规律：对于一个品质高的红酒来说，酒精浓度应该高于13%，醋酸含量应该低于0.4g/dm^3 ，硫酸钾含量应该在0.6~1.0g/dm^3之间。以后我在挑选红酒时候就有参考了。  
+（2）另外通过查询资料，我还掌握了如何给图例改名，或者改图例字体大小。  
+（3）掌握了各种图的绘图方法，散点图、直方图、箱线图对我来说都不是难事了。  
+**将来工作的探讨：**    
+（1）首先，需要扩充数据集，1599种红酒的得分大部分都为5或6分，需要更多3分，4分，8分，甚至9分的红酒数据，这样才能更好的判断参数之间的关系和趋势。  
+（2）另外，对于建模部分，我的知识还是相当匮乏，我还需要学习一些更高级的建模方法（如机器学习），扩充我的数学知识，这样才能建立更好数学模型来预测红酒的分数。  
+（3）R语言不是简单几课才能学明白的，我只是刚入门而已，需要在今后的工作中多多运用，多看帮助文档，这样才能成为一个合格的数据分析师。
+
+
+
+

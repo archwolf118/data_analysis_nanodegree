@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+
+        <script src="https://d3js.org/d3.v3.min.js"></script>
+        <!-- // <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script> -->
+        <!-- // <script src="http://dimplejs.org/dist/dimple.v2.0.0.min.js"></script> -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dimple/2.2.0/dimple.latest.js"></script>
+
+        <style>
+            
+            body { 
+                max-width:750px;
+                margin:0 auto;
+            }
+
+            h2 {
+                text-align: center;
+                left: 750px;
+            }
+
+            div.explanation {
+                -webkit-margin-start: 50px;
+                -webkit-margin-end: 50px;
+                font-family: "Arial";
+                font-size: 15px;
+            }
+
+
+            div.buttons {
+              position:relative;
+              top: 20px;
+              left: 80px;
+            }
+
+            div.buttons div {
+              background-color: rgb(251, 201, 127);
+              padding: 5px;
+              margin: 5px;
+              text-align: center;
+              float:left;
+            }
+
+        </style>
+
+        <script type="text/javascript">
+            function draw(data){
+                // debugger;
+
+                "use strict";
+                // 标题
+                d3.select("body")
+                  .append("h2")  
+                 .text("Comparison of Number of Titanic Survivors and Victims");
+
+                // 添加图表的解释
+                d3.select("body")
+                  .append("div")
+                  .attr("class","explanation")  
+                  .text("The below Chart is about statistical results of amount of Titanic survivors and victims.\
+                         The chart provide 6 choices for readers. 'Total' means total member group, \
+                         'Children' means the group members is under 12 years old,\
+                         'Adults' means the group members is above 12 years old, 'Class1' means 'First class passenger group', \
+                         'Class2' means 'Second class passenger group','Class3' means 'Third class passenger group'.\
+                         All groups are divided by sex. What interesting info you can find?");
+
+                var margin = 75,
+                    width = 800 - margin,
+                    height = 600 - margin;
+
+                // 把12岁以下的儿童分为一组，把12岁以上的分为另一组，分别统计
+                var data_child = [];
+                var data_adult =[];
+                data.forEach(function(d){
+                    if (d["Age"] > 0 && d["Age"] <= 12){
+                        data_child.push(d);
+                    }else{
+                        data_adult.push(d);
+                    };
+                });
+
+                // 一等舱、二等舱、三等舱的乘客分别统计
+                var data_class1 =[];
+                var data_class2 =[];
+                var data_class3 =[];
+                data.forEach(function(d){
+                    if (d["Pclass"] === 1) {
+                        data_class1.push(d);
+                    } else if (d["Pclass"] === 2) {
+                        data_class2.push(d);
+                    } else{
+                        data_class3.push(d);
+                    };
+                });
+
+                // 建立画图程序
+                function draw_chart(data1){
+
+                    var svg = dimple.newSvg("body", width + margin, height + margin);
+
+                    var myChart = new dimple.chart(svg, data1);
+                    var x = myChart.addCategoryAxis("x", ["Sex","Survived"]);
+                    var y = myChart.addMeasureAxis("y", "Number of people");
+                    var mySeries = myChart.addSeries(['Survived'], dimple.plot.bar);
+                    var myLegend = myChart.addLegend(600, 70, 50, 100, "right");
+                    myLegend.width = 50;
+                    mySeries.barGap = 0.4;
+                    myChart.setBounds(60, 30, 510, 305);
+
+                    myChart.draw();
+                    d3.select(".dimple-legend.dimple-legend-text.dimple-no").text("Dead");
+                    d3.select(".dimple-legend.dimple-legend-text.dimple-yes").text("Survived");
+
+                    };
+               
+                // 按钮的名称
+                var buttons_list = ["Total", "Children", "Adults", "Class1", "Class2","Class3"];
+
+                // 按钮对应的数据集
+                var data_set = {"Total": data,
+                                 "Children": data_child, 
+                                 "Adults":data_adult, 
+                                 "Class1": data_class1, 
+                                 "Class2": data_class2,
+                                 "Class3": data_class3};
+           
+                // 创建按钮类并和按钮名称绑定
+                var buttons = d3.select("body")
+                          .append("div")
+                          .attr("class","buttons")
+                          .selectAll("div")
+                          .data(buttons_list)
+                          .enter()
+                          .append("div")
+                          .text(function(d){return d;});
+
+                //网页刷新后初始化 
+                draw_chart(data);          
+                d3.select(".buttons")
+                      .select("div")
+                      .style("background","lightBlue")
+                      .style("color","white")
+
+                //点击按键生成不同的统计图
+                buttons.on("click", function(d){
+                    d3.select('svg')
+                      .remove()
+
+                    d3.select(".buttons")
+                      .selectAll("div")
+                      .transition()
+                      .duration(500)
+                      .style("color","black")
+                      .style("background","rgb(251,201,127)")
+
+                    d3.select(this)
+                      .transition()
+                      .duration(500)
+                      .style("background","lightBlue")
+                      .style("color","white")
+                    
+                    draw_chart(data_set[d]);
+
+                });
+
+                // debugger;
+
+            }
+        </script>
+
+    </head>
+
+    <body>
+        <script type="text/javascript">
+            d3.csv("titanic_data.csv", function(d){
+                // 由于Dimple.js在分类时会动态返回Survived的值，
+                // 为避免给出0或1，造成理解的困难，这里修改为yes或no；
+                if (d["Survived"] === "1"){d["Survived"] = "Yes";}
+                else {d["Survived"] = "No";}; 
+                d["Pclass"] = +d["Pclass"];
+                d["Age"] = +d["Age"];
+                // 针对dimple.js的计数特点，单独增加一列供统计用
+                d["Number of people"] = 1;
+                return d;
+            }, draw);
+        </script>
+
+    </body>
+</html>
